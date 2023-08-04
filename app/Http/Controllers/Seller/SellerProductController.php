@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Seller;
 
 use App\Http\Controllers\ApiController;
-use App\Seller;
+use App\{Seller, Product, User};
 use Illuminate\Http\Request;
 
 class SellerProductController extends ApiController
@@ -13,19 +13,11 @@ class SellerProductController extends ApiController
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Seller $seller)
     {
-        //
-    }
+        $products = $seller->products;
 
-    /**
-     * Show the form for creating a new resource.
-     *
-     * @return \Illuminate\Http\Response
-     */
-    public function create()
-    {
-        //
+        return $this->showAll($products);
     }
 
     /**
@@ -34,31 +26,24 @@ class SellerProductController extends ApiController
      * @param  \Illuminate\Http\Request  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(Request $request)
+    public function store(Request $request, User $seller)
     {
-        //
-    }
+        $rules = [
+            'name' => 'required',
+            'description' => 'required',
+            'quantity'=> 'required|integer|min:1',
+        ];
 
-    /**
-     * Display the specified resource.
-     *
-     * @param  \App\Seller  $seller
-     * @return \Illuminate\Http\Response
-     */
-    public function show(Seller $seller)
-    {
-        //
-    }
+        $this->validate($request, $rules);
 
-    /**
-     * Show the form for editing the specified resource.
-     *
-     * @param  \App\Seller  $seller
-     * @return \Illuminate\Http\Response
-     */
-    public function edit(Seller $seller)
-    {
-        //
+        $data = $request->all();
+        $data['status'] = Product::UNAVAILABLE_PRODUCT;
+        $data['image']  = '10.jpg';
+        $data['seller_id'] = $seller->id;
+
+        $product = Product::create($data);
+
+        return $this->showOne($product);
     }
 
     /**
@@ -68,9 +53,35 @@ class SellerProductController extends ApiController
      * @param  \App\Seller  $seller
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, Seller $seller)
+    public function update(Request $request, Seller $seller, Product $product)
     {
-        //
+        $rules = [
+            'status' => 'in:'.Product::AVAILABLE_PRODUCT.','.Product::UNAVAILABLE_PRODUCT,  
+            'quantity'=> 'required|integer|min:1',
+        ];
+
+        $this->validate($request, $rules);
+
+        $this->checkSeller($seller, $product);
+        
+
+        $product->fill($request->only('name','description','quantity'));
+
+        if($request->has('status')){
+            $product->status = $request->status;
+
+            if($product->isAvailable() && $product->categories()->count() == 0){
+                return $this->errorResponse('An Active product must have at least one category',409);
+            }
+        }
+
+        if($product->isClean()){
+            return $this->errorResponse('You need a specify a different value', 409);
+        }
+
+        $product->save();
+
+        return $this->showOne($product);
     }
 
     /**
@@ -79,8 +90,18 @@ class SellerProductController extends ApiController
      * @param  \App\Seller  $seller
      * @return \Illuminate\Http\Response
      */
-    public function destroy(Seller $seller)
+    public function destroy(Seller $seller, Product $product)
     {
-        //
+        $this->checkSeller($seller, $product);
+
+        $product->delete();
+
+        return $this->showOne($product);
+    }
+
+    public function checkSeller(Seller $seller, Product $product){
+        if($seller->id != $product->seller_id){
+            throw new HttpException(422, 'The specified seller is not the actual seller of the product');
+        }
     }
 }

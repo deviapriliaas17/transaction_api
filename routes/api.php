@@ -76,3 +76,5 @@ Route::resource('sellers.categories','Seller\SellerCategoryController',['only' =
 
 Route::resource('sellers.buyers','Seller\SellerBuyerController',['only' => ['index']]);
 
+Route::resource('sellers.products','Seller\SellerProductController',['except' => ['create','edit','show']]);
+
