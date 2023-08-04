@@ -94,7 +94,6 @@ class Handler extends ExceptionHandler
                return $this->errorResponse($message, $code);
            }
        }
-
        if(config('app.debug')){
            return parent::render($request, $exception);
        }
